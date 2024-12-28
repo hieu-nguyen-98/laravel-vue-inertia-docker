@@ -50,6 +50,8 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
     Route::group(["prefix" => "/categories"], function () {
         Route::get('/', [CategoryController::class, 'index'])->name('categories.index');
+        Route::get('/{category}/show', [CategoryController::class, 'show'])->name('categories.show'); // show user
+
     });
     
     Route::resource('/roles', RoleController::class);

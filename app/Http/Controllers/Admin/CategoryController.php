@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CategoryResource;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Response;
 use Inertia\Inertia;
@@ -12,13 +14,22 @@ class CategoryController extends Controller
 
     public function index(): Response
     {
-        return Inertia::render('Admin/Category/Index');
-        // $loggedInUser = Auth::user()->id;
-        // $users = User::whereNot('id', $loggedInUser)
-        //     ->whereNull('deleted_at')->get();
+        $categories = Category::with('parent')->paginate(15);
+        return Inertia::render('Admin/Category/Index', [
+            'categories' => CategoryResource::collection($categories), 
+            'pagination' => [
+                'total' => $categories->total(),
+                'per_page' => $categories->perPage(),
+                'current_page' => $categories->currentPage(),
+                'last_page' => $categories->lastPage(),
+                'from' => $categories->firstItem(),
+                'to' => $categories->lastItem(),
+            ],
+        ]);
+    }
 
-        // return Inertia::render('Admin/Users/Index', [
-        //     'users' => UserResource::collection($users)
-        // ]);
+    public function show()
+    {
+        return 1;
     }
 }
