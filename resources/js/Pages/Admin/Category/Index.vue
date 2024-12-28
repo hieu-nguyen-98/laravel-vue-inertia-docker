@@ -1,6 +1,7 @@
 <script setup>
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
 
 defineProps({
   trashed: false,
@@ -13,10 +14,36 @@ defineProps({
       total: 0,
     }),
   },
+  filters: {
+    type: Object,
+    default: () => ({ 
+      search: '' ,
+      start_date: '',
+      end_date: '',
+    }),
+  },
 });
 const formatDate  = (dateString) => {
   const date = new Date(dateString);
   return date.toLocaleDateString('vi-VN');
+};
+const searchQuery = ref('');
+const startDate = ref('');
+const endDate = ref('');
+const performSearch = () => {
+  router.get(route('categories.index'), { 
+    search: searchQuery.value,
+    start_date: startDate.value,
+    end_date: endDate.value,
+  }, { preserveState: true });
+};
+const changePage = (page) => {
+  router.get(route('categories.index'), { 
+    search: searchQuery.value, 
+    start_date: startDate.value,
+    end_date: endDate.value,
+    page 
+  }, { preserveState: true });
 };
 </script>
 <template>
@@ -27,6 +54,52 @@ const formatDate  = (dateString) => {
 
     <div class="max-w-7xl mx-auto py-4">
       <div class="flex justify-between">
+        <div hidden class="md:block">
+          <div class="relative flex items-center text-gray-400 focus-within:text-cyan-400">
+            <!-- <span class="absolute left-4 h-6 flex items-center pr-3 border-r border-gray-300">
+              <svg xmlns="http://ww50w3.org/2000/svg" class="w-4 fill-current" viewBox="0 0 35.997 36.004">
+                <path id="Icon_awesome-search" data-name="search"
+                  d="M35.508,31.127l-7.01-7.01a1.686,1.686,0,0,0-1.2-.492H26.156a14.618,14.618,0,1,0-2.531,2.531V27.3a1.686,1.686,0,0,0,.492,1.2l7.01,7.01a1.681,1.681,0,0,0,2.384,0l1.99-1.99a1.7,1.7,0,0,0,.007-2.391Zm-20.883-7.5a9,9,0,1,1,9-9A8.995,8.995,0,0,1,14.625,23.625Z">
+                </path>
+              </svg>
+            </span> -->
+            <button 
+              @click="performSearch"
+              aria-label="search"
+              class="absolute left-4 h-6 flex items-center pr-3 border-r border-gray-300"
+            >
+              <svg xmlns="http://ww50w3.org/2000/svg" class="w-4 mx-auto fill-current text-gray-600"
+                viewBox="0 0 35.997 36.004">
+                <path id="Icon_awesome-search" data-name="search"
+                  d="M35.508,31.127l-7.01-7.01a1.686,1.686,0,0,0-1.2-.492H26.156a14.618,14.618,0,1,0-2.531,2.531V27.3a1.686,1.686,0,0,0,.492,1.2l7.01,7.01a1.681,1.681,0,0,0,2.384,0l1.99-1.99a1.7,1.7,0,0,0,.007-2.391Zm-20.883-7.5a9,9,0,1,1,9-9A8.995,8.995,0,0,1,14.625,23.625Z">
+                </path>
+              </svg>
+            </button>
+            <input 
+              type="search" 
+              v-model="searchQuery"
+              @keydown.enter.prevent="performSearch"
+              id="leadingIcon" 
+              placeholder="Search here"
+              class="w-full pl-14 pr-4 py-2.5 rounded-xl text-sm text-gray-600 outline-none border border-gray-300 focus:border-cyan-300 transition" 
+            />
+            <input 
+              type="date" 
+              v-model="startDate" 
+              @change="performSearch" 
+              placeholder="Start Date"
+              class="w-full ml-2 pl-14 pr-4 py-2.5 rounded-xl text-sm text-gray-600 outline-none border border-gray-300 focus:border-cyan-300 transition" 
+
+            />
+            <input 
+              type="date" 
+              v-model="endDate" 
+              @change="performSearch" 
+              placeholder="End Date"
+              class="w-full ml-2 pl-14 pr-4 py-2.5 rounded-xl text-sm text-gray-600 outline-none border border-gray-300 focus:border-cyan-300 transition" 
+            />
+          </div>
+        </div>
         <Link 
           class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition ease-in-out duration-150">
           Create Category
@@ -101,32 +174,32 @@ const formatDate  = (dateString) => {
 
         <div class="mt-4 flex justify-between items-center">
           <div v-if="categories.meta.current_page > 1">
-            <Link
-              :href="`?page=${categories.meta.current_page - 1}`"
-              class="bg-blue-500 text-white px-4 py-2 rounded"
+            <button
+              @click="changePage(categories.meta.current_page - 1)"
+              class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
             >
               Previous
-            </Link>
+            </button>
           </div>
           <div class="mt-4 flex justify-center space-x-2">
-            <Link
+            <button
               v-for="page in Array.from({ length: categories.meta.last_page }, (_, i) => i + 1)"
               :key="page"
-              :href="`?page=${page}`"
-              class="px-4 py-2 border rounded text-sm"
+              @click="changePage(page)"
+              class="px-4 py-2 border rounded text-sm hover:bg-blue-100 transition"
               :class="{ 'bg-blue-500 text-white': page === categories.meta.current_page }"
             >
               {{ page }}
-            </Link>
+            </button>
           </div>
 
           <div v-if="categories.meta.current_page < categories.meta.last_page">
-            <Link
-              :href="`?page=${categories.meta.current_page + 1}`"
-              class="bg-blue-500 text-white px-4 py-2 rounded"
+            <button
+              @click="changePage(categories.meta.current_page + 1)"
+              class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
             >
               Next
-            </Link>
+            </button>
           </div>
         </div>
 

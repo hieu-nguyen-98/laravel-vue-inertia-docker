@@ -40,15 +40,10 @@ defineProps({
           </li>
           <li>
             <SidebarLink :href="route('categories.index')" :active="route().current('categories.index')">
-              <svg class="-ml-1 h-6 w-6" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M6 8a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8ZM6 15a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-1Z"
-                  class="fill-current text-cyan-400 dark:fill-slate-600"></path>
-                <path d="M13 8a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2V8Z"
-                  class="fill-current text-cyan-200 group-hover:text-cyan-300"></path>
-                <path d="M13 15a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-1Z"
-                  class="fill-current group-hover:text-sky-300"></path>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" />
               </svg>
+
               <span class="-mr-1 font-medium">Category</span>
             </SidebarLink>
           </li>
@@ -126,7 +121,6 @@ defineProps({
             </svg>
           </button>
           <div class="flex space-x-4">
-            <!-- search bar -->
             <div hidden class="md:block">
               <div class="relative flex items-center text-gray-400 focus-within:text-cyan-400">
                 <span class="absolute left-4 h-6 flex items-center pr-3 border-r border-gray-300">
@@ -140,7 +134,6 @@ defineProps({
                   class="w-full pl-14 pr-4 py-2.5 rounded-xl text-sm text-gray-600 outline-none border border-gray-300 focus:border-cyan-300 transition" />
               </div>
             </div>
-            <!--/ search bar -->
             <button aria-label="search"
               class="w-10 h-10 rounded-xl border bg-gray-100 focus:bg-gray-100 active:bg-gray-200 md:hidden">
               <svg xmlns="http://ww50w3.org/2000/svg" class="w-4 mx-auto fill-current text-gray-600"
