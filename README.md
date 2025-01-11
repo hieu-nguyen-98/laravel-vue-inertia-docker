@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# laravel-vue-inertia-docker
-=======
 # Simple User Management
 
 A [Dockerized](https://www.docker.com/) Laravel application built using **[Laravel Breeze](https://github.com/laravel/breeze)** + **[Inertia.js](https://inertiajs.com)** + **[Vue.js](https://vuejs.org/)**. This project provides a foundation for implementing CRUD (Create, Read, Update, Delete) functionalities for user management, utilizing Spatie's [Laravel Permission](https://spatie.be/docs/laravel-permission/v6/introduction) package, to provide a flexible and efficient way to assign roles and permissions to users, ensuring granular control over access levels.
@@ -102,5 +99,4 @@ Contributions are welcome! Please follow these guidelines:
 
 - For more information on Laravel Breeze, Inertia.js, and Vue.js, please refer to their official documentation.
 - Customize the project to fit your specific needs by adding more features or modifying the existing ones.
->>>>>>> 8c59cbb (Initial commit for Laravel-Vue-Inertia-Docker)
 # laravel-vue-inertia-docker
