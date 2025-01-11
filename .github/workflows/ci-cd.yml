@@ -1,67 +1,91 @@
-name: CI/CD Pipeline
+image: php:8.2-fpm-alpine
 
-on:
-  push:
-    branches:
-      - main
+.before_build_script:
+  before_script:
+    - echo "$ENV_CONTENT" >> .env
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.DB_DATABASE }}
-          MYSQL_USER: ${{ secrets.DB_USERNAME }}
-          MYSQL_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        ports:
-          - 3306:3306
-        options: --health-cmd='mysqladmin ping --host=localhost' --health-interval=10s --health-timeout=5s --health-retries=3
+cache:
+  untracked: true
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - vendor/
+    - bootstrap/cache/
+    - node_modules/
 
-      # Dịch vụ PHP + Nginx + Mailhog, nếu cần
-      php:
-        image: ${PROJECT_NAME}_php:${APP_ENV}
-        ports:
-          - 9000:9000
-        env:
-          SERVICE_NAME: php
-          SERVICE_TAGS: dev
-        volumes:
-          - .:/var/www
-        depends_on:
-          - mysql
+services:
+  - mysql:8.0
 
-      # Mailhog (nếu cần gửi email kiểm tra)
-      mailhog:
-        image: mailhog/mailhog
-        ports:
-          - "1025:1025"
-          - "8025:8025"
+variables:
+  TAG_LATEST: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:latest
+  TAG_COMMIT: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA
+  CONTAINER_NAME: "io_tasks_app"
+  ENV_CONTENT: $PROD_ENV
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  # mysql service credentials if using gitlab ci mysql for shared runner
+  # otherwise set correct credentials for a private runner
+  MYSQL_DATABASE: simpleuser
+  MYSQL_ROOT_PASSWORD: root
+  DB_DATABASE: simpleuser
+  DB_PASSWORD: password
+  DB_HOST: mysql
+  DB_USERNAME: simpleuser
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+stages:
+  - test
+  - build
+  - deploy
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
+unit_test:
+  stage: test
+  #tags:
+  #  - test_app
+  script:
+    - cp .env.example .env
+    - composer clearcache
+    - composer install
+    - php artisan key:generate
+    - php artisan migrate:fresh --force
+    - php artisan db:seed
+    - vendor/bin/phpunit
+    # test frontend
+    - quasar info
+    - npm run install-spa
+    - npm run test-spa
 
-      - name: Build and test PHP application
-        run: |
-          docker-compose -f docker-compose.yml up -d
-          docker-compose exec php composer install --no-interaction --prefer-dist --optimize-autoloader
-          docker-compose exec php php artisan migrate --force
-          docker-compose exec php php artisan config:cache
-          docker-compose exec php php artisan route:cache
+build_image:
+  extends: .before_build_script
+  image: docker:latest
+  stage: build
+  #tags:
+  #  - build_app
+  services:
+    - docker:19.03.0-dind
+  script:
+    - docker build -t $TAG_COMMIT -t $TAG_LATEST .
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+    - docker push $TAG_COMMIT
+    - docker push $TAG_LATEST
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
 
-      - name: Run tests
-        run: |
-          docker-compose exec php ./vendor/bin/phpunit
-
-      - name: Push to DockerHub
-        if: github.ref == 'refs/heads/main'
-        run: |
-          docker-compose -f docker-compose.yml build
-          docker-compose push
+deploy_production:
+  image: alpine:latest
+  stage: deploy
+  #tags:
+   # - prod_deployment
+  script:
+    - chmod og= $SSH_PRIVATE_KEY
+    - apk update && apk add openssh-client
+    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY"
+    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker pull $TAG_COMMIT"
+    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker container rm -f $CONTAINER_NAME || true"
+    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker run -d -p 8050:8050 --restart unless-stopped --network=host --name $CONTAINER_NAME $TAG_COMMIT"
+    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker image prune -a -f || true"
+  environment:
+    name: production
+    url: http://192.168.7.237:8080
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
