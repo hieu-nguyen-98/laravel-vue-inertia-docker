@@ -16,11 +16,11 @@ jobs:
     services:
       mysql:
         image: mysql:8.0
-          env:
-            MYSQL_ROOT_PASSWORD: root
-            MYSQL_DATABASE: simpleuser
-            MYSQL_USER: simpleuser
-            MYSQL_PASSWORD: password
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: simpleuser
+          MYSQL_USER: simpleuser
+          MYSQL_PASSWORD: password
         options: >-
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
@@ -42,31 +42,49 @@ jobs:
           extensions: mbstring, bcmath, pdo_mysql
           tools: composer
 
-      - name: Install Laravel Dependencies
+      # Step 3: Thiết lập Laravel Environment
+      - name: Setup Laravel Environment
         run: |
           cp .env.example .env
+          echo "DB_HOST=mysql" >> .env
+          echo "DB_USERNAME=simpleuser" >> .env
+          echo "DB_PASSWORD=password" >> .env
+          php artisan config:clear
+
+      # Step 4: Chờ MySQL sẵn sàng
+      - name: Wait for MySQL to be ready
+        run: |
+          until mysqladmin ping -h mysql -u${{ secrets.DB_USERNAME }} -p${{ secrets.DB_PASSWORD }} --silent; do
+            echo "Waiting for MySQL..."
+            sleep 5
+          done
+
+      # Step 5: Cài đặt và cài dependencies cho Laravel
+      - name: Install Laravel Dependencies
+        run: |
           composer install
           php artisan key:generate
           php artisan migrate --force
 
-      # Step 3: Cài đặt và build Vue.js
+      # Step 6: Setup Node.js cho Vue.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install Vue.js Dependencies
+      # Step 7: Cài đặt và build Vue.js
+      - name: Install Vue.js Dependencies and Build
         run: |
           cd resources/js
           npm install
           npm run build
           cd ../../
 
-      # Step 4: Chạy test Laravel
+      # Step 8: Chạy test Laravel
       - name: Run Laravel Tests
         run: php artisan test
 
-      # Step 5: Lint Vue.js
+      # Step 9: Lint Vue.js
       - name: Lint Vue.js
         run: |
           cd resources/js
@@ -81,6 +99,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      # Step: Deploy via SSH
       - name: Deploy via SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
