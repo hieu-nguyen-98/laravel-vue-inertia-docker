@@ -1,91 +1,89 @@
-image: php:8.2-fpm-alpine
+name: Laravel + Vue.js CI/CD Pipeline
 
-.before_build_script:
-  before_script:
-    - echo "$ENV_CONTENT" >> .env
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-cache:
-  untracked: true
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - vendor/
-    - bootstrap/cache/
-    - node_modules/
+jobs:
+  build-and-test:
+    name: Build, Test, and Lint
+    runs-on: ubuntu-latest
 
-services:
-  - mysql:8.0
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: simpleuser
+          MYSQL_USER: simpleuser
+          MYSQL_PASSWORD: password
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
 
-variables:
-  TAG_LATEST: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:latest
-  TAG_COMMIT: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA
-  CONTAINER_NAME: "io_tasks_app"
-  ENV_CONTENT: $PROD_ENV
-  DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: "/certs"
-  # mysql service credentials if using gitlab ci mysql for shared runner
-  # otherwise set correct credentials for a private runner
-  MYSQL_DATABASE: simpleuser
-  MYSQL_ROOT_PASSWORD: root
-  DB_DATABASE: simpleuser
-  DB_PASSWORD: password
-  DB_HOST: mysql
-  DB_USERNAME: simpleuser
+    steps:
+      # Step 1: Checkout code từ repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-stages:
-  - test
-  - build
-  - deploy
+      # Step 2: Thiết lập PHP và Composer cho Laravel
+      - name: Setup PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, pdo_mysql
+          tools: composer
 
-unit_test:
-  stage: test
-  #tags:
-  #  - test_app
-  script:
-    - cp .env.example .env
-    - composer clearcache
-    - composer install
-    - php artisan key:generate
-    - php artisan migrate:fresh --force
-    - php artisan db:seed
-    - vendor/bin/phpunit
-    # test frontend
-    - quasar info
-    - npm run install-spa
-    - npm run test-spa
+      # Step 3: Cài đặt dependencies cho Laravel
+      - name: Install Laravel Dependencies
+        run: |
+          cp .env.example .env  # Copy .env.example thành .env
+          composer install       # Cài đặt các dependencies của Laravel
+          php artisan key:generate # Tạo key cho ứng dụng Laravel
+          php artisan migrate --force # Chạy migration
 
-build_image:
-  extends: .before_build_script
-  image: docker:latest
-  stage: build
-  #tags:
-  #  - build_app
-  services:
-    - docker:19.03.0-dind
-  script:
-    - docker build -t $TAG_COMMIT -t $TAG_LATEST .
-    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
-    - docker push $TAG_COMMIT
-    - docker push $TAG_LATEST
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
+      # Step 4: Cài đặt và build Vue.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-deploy_production:
-  image: alpine:latest
-  stage: deploy
-  #tags:
-   # - prod_deployment
-  script:
-    - chmod og= $SSH_PRIVATE_KEY
-    - apk update && apk add openssh-client
-    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY"
-    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker pull $TAG_COMMIT"
-    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker container rm -f $CONTAINER_NAME || true"
-    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker run -d -p 8050:8050 --restart unless-stopped --network=host --name $CONTAINER_NAME $TAG_COMMIT"
-    - ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker image prune -a -f || true"
-  environment:
-    name: production
-    url: http://192.168.7.237:8080
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
+      - name: Install Vue.js Dependencies
+        run: |
+          cd resources/js
+          npm install
+          npm run build
+          cd ../../
+
+      # Step 5: Chạy test Laravel
+      - name: Run Laravel Tests
+        run: php artisan test
+
+      # Step 6: Lint Vue.js
+      - name: Lint Vue.js
+        run: |
+          cd resources/js
+          npm run lint
+          cd ../../
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy via SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          ssh -o StrictHostKeyChecking=no user@your-server "cd /var/www && docker-compose pull && docker-compose up -d"
