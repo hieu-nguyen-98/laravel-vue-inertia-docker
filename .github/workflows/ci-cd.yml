@@ -1,0 +1,88 @@
+name: Laravel + Vue.js CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build, Test, and Lint
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+          env:
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: simpleuser
+            MYSQL_USER: simpleuser
+            MYSQL_PASSWORD: password
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
+
+    steps:
+      # Step 1: Checkout code từ repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Thiết lập PHP và Composer cho Laravel
+      - name: Setup PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, bcmath, pdo_mysql
+          tools: composer
+
+      - name: Install Laravel Dependencies
+        run: |
+          cp .env.example .env
+          composer install
+          php artisan key:generate
+          php artisan migrate --force
+
+      # Step 3: Cài đặt và build Vue.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Vue.js Dependencies
+        run: |
+          cd resources/js
+          npm install
+          npm run build
+          cd ../../
+
+      # Step 4: Chạy test Laravel
+      - name: Run Laravel Tests
+        run: php artisan test
+
+      # Step 5: Lint Vue.js
+      - name: Lint Vue.js
+        run: |
+          cd resources/js
+          npm run lint
+          cd ../../
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy via SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          ssh -o StrictHostKeyChecking=no user@your-server "cd /var/www && docker-compose pull && docker-compose up -d"
